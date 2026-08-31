@@ -39,30 +39,10 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: cors });
 }
 
-// GET — image pixel fallback + debug test
+// GET — image pixel fallback
 export async function GET(request: NextRequest) {
-  // ?test=PIXEL_ID — returns creator lookup result for debugging
-  const testId = request.nextUrl.searchParams.get('test');
-  if (testId) {
-    const supabase = createAdminSupabase();
-    const { data: creator, error } = await supabase
-      .from('profiles')
-      .select('id, pixel_id, email')
-      .eq('pixel_id', testId)
-      .single();
-    return NextResponse.json({
-      debug: true,
-      found: !!creator,
-      creator_id: creator?.id || null,
-      pixel_id: creator?.pixel_id || null,
-      email: creator?.email || null,
-      error: error?.message || null,
-      timestamp: new Date().toISOString(),
-    }, { status: 200, headers: cors });
-  }
-
   const d = request.nextUrl.searchParams.get('d');
-  if (d) { try { processEvent(JSON.parse(d), request); } catch {} }
+  if (d) { try { await processEvent(JSON.parse(d), request); } catch {} }
   return new NextResponse(TRANSPARENT_GIF, {
     status: 200,
     headers: { ...cors, 'Content-Type': 'image/gif', 'Cache-Control': 'no-store' },
@@ -71,13 +51,6 @@ export async function GET(request: NextRequest) {
 
 // POST — main collection
 export async function POST(request: NextRequest) {
-  console.log('[collect] Request received:', {
-    method: request.method,
-    origin: request.headers.get('origin'),
-    contentType: request.headers.get('content-type'),
-    ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
-  });
-
   try {
     // Parse body — sendBeacon sends as text/plain to avoid CORS preflight,
     // so fall back to parsing raw text if .json() fails
@@ -88,13 +61,13 @@ export async function POST(request: NextRequest) {
       const text = await request.text();
       body = JSON.parse(text);
     }
-    console.log('[collect] Payload:', { pixel_id: body.pixel_id, visitor_id: body.visitor_id, page_url: body.page_url });
 
-    // Fire processing without awaiting — respond immediately
-    processEvent(body, request);
+    // Serverless functions freeze after responding, so processing must
+    // complete before the response is returned
+    await processEvent(body, request);
     return NextResponse.json({ status: 'ok' }, { status: 200, headers: cors });
   } catch (err) {
-    console.error('[collect] Failed to parse body:', err);
+    console.error('[collect] Failed to parse body');
     return NextResponse.json({ status: 'ok' }, { status: 200, headers: cors });
   }
 }
@@ -131,7 +104,6 @@ async function processEvent(body: any, request: NextRequest) {
       console.warn('[collect] Creator not found for pixel_id:', pixel_id);
       return;
     }
-    console.log('[collect] Matched creator:', creator.id, 'for pixel:', pixel_id);
 
     // 2. Extract server-side data
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()

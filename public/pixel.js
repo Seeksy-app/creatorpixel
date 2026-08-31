@@ -104,9 +104,8 @@ function send(evType,extra){
 if(!pid)return;
 // Pageview dedup — only one pageview per page load, no matter how many call paths
 if(evType==='pageview'){
-if(w._cpx_tracked){console.log('[CPX] pageview BLOCKED (already tracked)');return}
-w._cpx_tracked=true;
-console.log('[CPX] pageview ALLOWED (first fire)')}
+if(w._cpx_tracked)return;
+w._cpx_tracked=true}
 var u=gutm(),p={
 pixel_id:pid,
 visitor_id:gvid(),
@@ -137,10 +136,9 @@ function cpx(){
 var args=arguments,cmd=args[0],a1=args[1],a2=args[2];
 switch(cmd){
 case'init':
-console.log('[CPX init] arguments:',args[0],args[1],args[2]);
 pid=a1;
 var opts=a2||{};
-if(opts.rb2b){rb2bId=opts.rb2b;console.log('[CPX] RB2B id found:',rb2bId)}
+if(opts.rb2b)rb2bId=opts.rb2b;
 while(q.length){var c=q.shift();cpx(c[0],c[1],c[2])}
 if(rb2bId)injectRB2B(rb2bId);
 break;
