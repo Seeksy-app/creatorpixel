@@ -1,159 +1,192 @@
 import { createAdminSupabase } from '@/lib/supabase/server';
 import { shouldOverwrite, logIdentityEvent, CONFIDENCE } from '@/lib/pdl';
+import { extractDomain } from '@/lib/utils';
 import { NextRequest, NextResponse } from 'next/server';
 
-// POST /api/webhooks/rb2b
-// Layer 1: RB2B sends LinkedIn profile data when a visitor is identified
+// POST /api/webhooks/rb2b?secret=...
+// Layer 1: RB2B sends LinkedIn profile data when a visitor is identified.
+//
+// RB2B payload uses Title-Case keys with spaces ("LinkedIn URL", "First Name",
+// "Business Email", "Captured URL", ...) and contains no IP address. RB2B has
+// no header-auth option — the shared secret must ride in the URL query string.
+
+// Deterministic visitor id so repeat webhooks for the same person update one record
+function rb2bVisitorId(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) { h = ((h << 5) - h) + seed.charCodeAt(i); h = h | 0; }
+  return 'rb2b_' + Math.abs(h).toString(36);
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Verify webhook secret
+    // Auth — fail closed: no configured secret means no webhook processing
     const secret = process.env.RB2B_WEBHOOK_SECRET;
-    if (secret) {
-      const provided = request.headers.get('x-webhook-secret')
-        || request.headers.get('authorization')?.replace('Bearer ', '') || '';
-      if (provided !== secret) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    if (!secret) {
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+    }
+    const provided = request.nextUrl.searchParams.get('secret')
+      || request.headers.get('x-webhook-secret')
+      || request.headers.get('authorization')?.replace('Bearer ', '')
+      || '';
+    if (provided !== secret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
-    const {
-      email, first_name, last_name,
-      linkedin_url, company_name, job_title,
-      city, state, country,
-      ip_address, profile_image_url,
-      pixel_id, site_id,
-    } = body;
 
-    if (!ip_address && !email) {
-      return NextResponse.json({ error: 'ip_address or email required' }, { status: 400 });
+    // RB2B's native keys, with snake_case fallbacks for manual testing
+    const linkedinUrl = body['LinkedIn URL'] || body.linkedin_url || null;
+    const firstName = body['First Name'] || body.first_name || null;
+    const lastName = body['Last Name'] || body.last_name || null;
+    const jobTitle = body['Title'] || body.job_title || null;
+    const companyName = body['Company Name'] || body.company_name || null;
+    const email = body['Business Email'] || body.email || null;
+    const city = body['City'] || body.city || null;
+    const state = body['State'] || body.state || null;
+    const zipcode = body['Zipcode'] || body.zipcode || null;
+    const capturedUrl = body['Captured URL'] || body.captured_url || null;
+    const pixelId = body.pixel_id || body.site_id || request.nextUrl.searchParams.get('pixel_id') || null;
+
+    if (!linkedinUrl && !email) {
+      return NextResponse.json({ error: 'LinkedIn URL or Business Email required' }, { status: 400 });
     }
 
     const supabase = createAdminSupabase();
-    const fullName = [first_name, last_name].filter(Boolean).join(' ') || null;
-    const location = [city, state, country].filter(Boolean).join(', ') || null;
+    const fullName = [firstName, lastName].filter(Boolean).join(' ') || null;
+    const location = [city, state, zipcode].filter(Boolean).join(', ') || null;
 
-    // Find the creator this webhook belongs to
+    // Find the creator this webhook belongs to:
+    // 1. explicit pixel_id (query param or body)
+    // 2. domain of the captured page → pixel_installs
     let creatorId: string | null = null;
 
-    if (pixel_id || site_id) {
+    if (pixelId) {
       const { data: creator } = await supabase
         .from('profiles')
         .select('id')
-        .eq('pixel_id', pixel_id || site_id)
+        .eq('pixel_id', pixelId)
         .single();
       creatorId = creator?.id || null;
     }
 
-    // Fallback: match by IP in recent page views
-    if (!creatorId && ip_address) {
-      const { data: recentView } = await supabase
-        .from('page_view_events')
-        .select('creator_id')
-        .eq('ip_address', ip_address)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      creatorId = recentView?.creator_id || null;
+    if (!creatorId && capturedUrl) {
+      const domain = extractDomain(capturedUrl);
+      if (domain && domain !== 'unknown') {
+        const { data: install } = await supabase
+          .from('pixel_installs')
+          .select('creator_id')
+          .eq('domain', domain)
+          .order('last_seen_at', { ascending: false })
+          .limit(1)
+          .single();
+        creatorId = install?.creator_id || null;
+      }
     }
 
     if (!creatorId) {
       return NextResponse.json({ error: 'No matching creator' }, { status: 404 });
     }
 
-    // Find visitors with this IP
-    let matchCount = 0;
+    const enrichedFields = {
+      email,
+      full_name: fullName,
+      company: companyName,
+      job_title: jobTitle,
+      linkedin_url: linkedinUrl,
+      identified: true,
+      identity_source: 'rb2b',
+      confidence_score: CONFIDENCE.rb2b,
+      inferred_location: location,
+      enriched_at: new Date().toISOString(),
+    };
 
-    if (ip_address) {
-      const { data: visitors } = await supabase
+    // Match an existing visitor by email, then by LinkedIn URL
+    let visitor: any = null;
+    if (email) {
+      const { data } = await supabase
         .from('visitors')
         .select('id, visitor_id, email, confidence_score, identity_source, full_name, company')
-        .eq('user_id', creatorId)
-        .contains('ip_addresses', [ip_address]);
-
-      if (visitors) {
-        for (const visitor of visitors) {
-          // Only overwrite if RB2B confidence is higher than current
-          if (!shouldOverwrite(visitor.identity_source, visitor.confidence_score || 0, 'rb2b')) {
-            continue;
-          }
-
-          const dataBefore = {
-            email: visitor.email,
-            full_name: visitor.full_name,
-            company: visitor.company,
-            identity_source: visitor.identity_source,
-            confidence_score: visitor.confidence_score,
-          };
-
-          await supabase.from('visitors').update({
-            email: email || visitor.email,
-            full_name: fullName || visitor.full_name,
-            company: company_name || visitor.company,
-            job_title: job_title || null,
-            linkedin_url: linkedin_url || null,
-            avatar_url: profile_image_url || null,
-            identified: true,
-            identity_source: 'rb2b',
-            confidence_score: CONFIDENCE.rb2b,
-            inferred_location: location,
-            enriched_at: new Date().toISOString(),
-          }).eq('id', visitor.id);
-
-          await logIdentityEvent(
-            creatorId, visitor.visitor_id, 'rb2b_match',
-            CONFIDENCE.rb2b, 'rb2b',
-            dataBefore,
-            { email, full_name: fullName, company: company_name, linkedin_url }
-          );
-
-          matchCount++;
-        }
-      }
-    }
-
-    // If no IP match, try email match
-    if (matchCount === 0 && email) {
-      const { data: visitor } = await supabase
-        .from('visitors')
-        .select('id, visitor_id, confidence_score, identity_source, full_name, company')
         .eq('user_id', creatorId)
         .eq('email', email)
         .limit(1)
         .single();
-
-      if (visitor && shouldOverwrite(visitor.identity_source, visitor.confidence_score || 0, 'rb2b')) {
-        const dataBefore = {
-          full_name: visitor.full_name,
-          company: visitor.company,
-          identity_source: visitor.identity_source,
-        };
-
-        await supabase.from('visitors').update({
-          full_name: fullName || visitor.full_name,
-          company: company_name || visitor.company,
-          job_title: job_title || null,
-          linkedin_url: linkedin_url || null,
-          avatar_url: profile_image_url || null,
-          identified: true,
-          identity_source: 'rb2b',
-          confidence_score: CONFIDENCE.rb2b,
-          inferred_location: location,
-          enriched_at: new Date().toISOString(),
-        }).eq('id', visitor.id);
-
-        await logIdentityEvent(
-          creatorId, visitor.visitor_id, 'rb2b_match',
-          CONFIDENCE.rb2b, 'rb2b',
-          dataBefore,
-          { full_name: fullName, company: company_name, linkedin_url }
-        );
-
-        matchCount++;
-      }
+      visitor = data;
+    }
+    if (!visitor && linkedinUrl) {
+      const { data } = await supabase
+        .from('visitors')
+        .select('id, visitor_id, email, confidence_score, identity_source, full_name, company')
+        .eq('user_id', creatorId)
+        .eq('linkedin_url', linkedinUrl)
+        .limit(1)
+        .single();
+      visitor = data;
     }
 
-    return NextResponse.json({ status: 'ok', matched: matchCount });
+    if (visitor) {
+      if (!shouldOverwrite(visitor.identity_source, visitor.confidence_score || 0, 'rb2b')) {
+        return NextResponse.json({ status: 'ok', matched: 0, skipped: 'higher confidence exists' });
+      }
+
+      const dataBefore = {
+        email: visitor.email,
+        full_name: visitor.full_name,
+        company: visitor.company,
+        identity_source: visitor.identity_source,
+        confidence_score: visitor.confidence_score,
+      };
+
+      await supabase.from('visitors').update({
+        ...enrichedFields,
+        email: email || visitor.email,
+        full_name: fullName || visitor.full_name,
+        company: companyName || visitor.company,
+      }).eq('id', visitor.id);
+
+      await logIdentityEvent(
+        creatorId, visitor.visitor_id, 'rb2b_match',
+        CONFIDENCE.rb2b, 'rb2b',
+        dataBefore,
+        { email, full_name: fullName, company: companyName, linkedin_url: linkedinUrl }
+      );
+
+      return NextResponse.json({ status: 'ok', matched: 1 });
+    }
+
+    // No existing visitor — create one so the identification isn't lost.
+    // Deterministic id keyed on the person, so repeats upsert rather than duplicate.
+    const visitorId = rb2bVisitorId(linkedinUrl || email);
+    const { data: existing } = await supabase
+      .from('visitors')
+      .select('id, visitor_id')
+      .eq('user_id', creatorId)
+      .eq('visitor_id', visitorId)
+      .limit(1)
+      .single();
+
+    if (existing) {
+      await supabase.from('visitors').update(enrichedFields).eq('id', existing.id);
+    } else {
+      await supabase.from('visitors').insert({
+        user_id: creatorId,
+        visitor_id: visitorId,
+        ...enrichedFields,
+        first_page_url: capturedUrl,
+        last_page_url: capturedUrl,
+        total_clicks: 0,
+        total_page_views: 0,
+        enrichment_attempts: 0,
+      });
+    }
+
+    await logIdentityEvent(
+      creatorId, visitorId, 'rb2b_match',
+      CONFIDENCE.rb2b, 'rb2b',
+      null,
+      { email, full_name: fullName, company: companyName, linkedin_url: linkedinUrl }
+    );
+
+    return NextResponse.json({ status: 'ok', matched: 1, created: !existing });
 
   } catch (error: any) {
     console.error('RB2B webhook error:', error);
