@@ -15,15 +15,18 @@ import {
   Loader2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import {
+  SiTiktok, SiInstagram, SiYoutube, SiLinkedin, SiFacebook, SiX, SiBluesky,
+} from 'react-icons/si';
 
 const PLATFORMS = [
-  { id: 'tiktok', name: 'TikTok', icon: '📱' },
-  { id: 'instagram', name: 'Instagram', icon: '📸' },
-  { id: 'youtube', name: 'YouTube', icon: '▶️' },
-  { id: 'linkedin', name: 'LinkedIn', icon: '💼' },
-  { id: 'facebook', name: 'Facebook', icon: '👍' },
-  { id: 'x', name: 'X/Twitter', icon: '𝕏' },
-  { id: 'bluesky', name: 'Bluesky', icon: '🦋' },
+  { id: 'tiktok', name: 'TikTok', Icon: SiTiktok, color: '#000000' },
+  { id: 'instagram', name: 'Instagram', Icon: SiInstagram, color: '#E4405F' },
+  { id: 'youtube', name: 'YouTube', Icon: SiYoutube, color: '#FF0000' },
+  { id: 'linkedin', name: 'LinkedIn', Icon: SiLinkedin, color: '#0A66C2' },
+  { id: 'facebook', name: 'Facebook', Icon: SiFacebook, color: '#1877F2' },
+  { id: 'x', name: 'X/Twitter', Icon: SiX, color: '#000000' },
+  { id: 'bluesky', name: 'Bluesky', Icon: SiBluesky, color: '#0285FF' },
 ] as const;
 
 type PlatformId = (typeof PLATFORMS)[number]['id'];
@@ -275,7 +278,7 @@ export default function SocialHubPage() {
                         : 'border-gray-200 bg-gray-50'
                     }`}
                   >
-                    <span className="text-lg">{platform.icon}</span>
+                    <platform.Icon className="w-4 h-4" style={{ color: platform.color }} />
                     <span className="text-sm font-medium">{platform.name}</span>
                     {connected ? (
                       <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -372,7 +375,7 @@ export default function SocialHubPage() {
                         onChange={() => togglePlatform(platform.id)}
                         className="rounded border-gray-300 text-brand-600 sr-only"
                       />
-                      <span>{platform.icon}</span>
+                      <platform.Icon className="w-4 h-4" style={{ color: platform.color }} />
                       <span className="text-sm font-medium">{platform.name}</span>
                     </label>
                   ))}
@@ -453,9 +456,11 @@ export default function SocialHubPage() {
                         const url = getPlatformUrl(post, p);
                         return (
                           <span key={p} className="text-xs flex items-center gap-1">
-                            <span>
-                              {PLATFORMS.find((x) => x.id === p)?.icon} {p}
-                            </span>
+                            {(() => {
+                              const pl = PLATFORMS.find((x) => x.id === p);
+                              return pl ? <pl.Icon className="w-3 h-3" style={{ color: pl.color }} /> : null;
+                            })()}
+                            <span>{p}</span>
                             {url && (
                               <a
                                 href={url}
