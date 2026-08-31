@@ -47,8 +47,10 @@ export async function POST(request: NextRequest) {
     const capturedUrl = body['Captured URL'] || body.captured_url || null;
     const pixelId = body.pixel_id || body.site_id || request.nextUrl.searchParams.get('pixel_id') || null;
 
+    // Respond 200 for unusable payloads — error statuses cause webhook
+    // providers to auto-disable the endpoint after repeated failures
     if (!linkedinUrl && !email) {
-      return NextResponse.json({ error: 'LinkedIn URL or Business Email required' }, { status: 400 });
+      return NextResponse.json({ status: 'ok', matched: 0, reason: 'no LinkedIn URL or Business Email' });
     }
 
     const supabase = createAdminSupabase();
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!creatorId) {
-      return NextResponse.json({ error: 'No matching creator' }, { status: 404 });
+      return NextResponse.json({ status: 'ok', matched: 0, reason: 'no matching creator' });
     }
 
     const enrichedFields = {
