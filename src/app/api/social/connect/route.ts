@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success || !result.connection_url) {
+      console.error('[social/connect] Upload-Post refused:', JSON.stringify(result));
       return NextResponse.json({ error: result.message || 'Failed to generate connection URL' }, { status: 500 });
     }
 
