@@ -29,12 +29,14 @@ export async function POST(request: NextRequest) {
       redirectButtonText: 'Return to CreatorPixel',
     });
 
-    if (!result.success || !result.connection_url) {
+    // Upload-Post returns the URL as access_url (older SDK docs said connection_url)
+    const connectionUrl = (result as any).access_url || result.connection_url;
+    if (!result.success || !connectionUrl) {
       console.error('[social/connect] Upload-Post refused:', JSON.stringify(result));
       return NextResponse.json({ error: result.message || 'Failed to generate connection URL' }, { status: 500 });
     }
 
-    return NextResponse.json({ connectionUrl: result.connection_url, jwt: result.jwt });
+    return NextResponse.json({ connectionUrl, jwt: result.jwt });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to connect';
     return NextResponse.json({ error: message }, { status: 500 });
