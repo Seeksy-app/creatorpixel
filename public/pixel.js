@@ -90,11 +90,12 @@ return'Other'}
 
 // Inject RB2B pixel (Layer 1) if configured
 function injectRB2B(rbId){
-if(!rbId||d.getElementById('cpx-rb2b'))return;
+if(!rbId||w.reb2b||d.getElementById('cpx-rb2b'))return;
 try{
+w.reb2b={loaded:true};
 var s=d.createElement('script');
 s.id='cpx-rb2b';s.type='text/javascript';s.async=true;
-s.src='https://s3-us-west-2.amazonaws.com/b2bjsstore/b/'+rbId+'/reb2b.js.gz';
+s.src='https://ddwl4m2hdecbv.cloudfront.net/b/'+rbId+'/'+rbId+'.js.gz';
 var x=d.getElementsByTagName('script')[0];
 x.parentNode.insertBefore(s,x);
 }catch(e){}}

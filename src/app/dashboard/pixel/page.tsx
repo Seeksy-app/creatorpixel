@@ -88,7 +88,7 @@ export default function PixelSettingsPage() {
     o.src='${appUrl}/pixel.js';
     p=r.getElementsByTagName(e)[0];p.parentNode.insertBefore(o,p);
   })(window,document,'script','','cpx');
-  cpx('init', '${pixelId}', { rb2b: 'R6G5YH81Y765' });
+  cpx('init', '${pixelId}', { rb2b: 'GOYPYH44EYOX' });
   cpx('track', 'pageview');
 </script>`;
 
