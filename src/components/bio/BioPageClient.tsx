@@ -121,9 +121,16 @@ export default function BioPageClient({ profile, blocks, linksMap, slug }: BioPa
     window.location.href = `${appUrl}/r/${shortCode}`;
   }
 
+  const pageAnimation = settings.page_animation;
+  const animClass =
+    pageAnimation === 'fade' ? 'cpx-anim-fade'
+    : pageAnimation === 'reveal_down' ? 'cpx-anim-reveal-down'
+    : pageAnimation === 'rise' ? 'cpx-anim-rise'
+    : '';
+
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-start pt-8 pb-16 px-4"
+      className={`min-h-screen flex flex-col items-center justify-start pt-8 pb-16 px-4 ${animClass}`}
       style={bgStyle}
     >
       <div className="w-full max-w-md animate-fade-in">

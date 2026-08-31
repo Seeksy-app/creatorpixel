@@ -37,3 +37,22 @@ body {
 .animate-link-in {
   animation: fade-in 0.4s ease-out forwards;
 }
+
+/* Bio page entrance animations (picked in Bio Page > Settings > Animation) */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes cpx-page-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes cpx-page-reveal-down {
+    from { clip-path: inset(0 0 100% 0); opacity: 0.4; }
+    to { clip-path: inset(0 0 0% 0); opacity: 1; }
+  }
+  @keyframes cpx-page-rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .cpx-anim-fade { animation: cpx-page-fade 0.9s ease-out both; }
+  .cpx-anim-reveal-down { animation: cpx-page-reveal-down 1s ease-in-out both; }
+  .cpx-anim-rise { animation: cpx-page-rise 0.7s ease-out both; }
+}

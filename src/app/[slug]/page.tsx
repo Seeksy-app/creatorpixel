@@ -45,7 +45,11 @@ export default async function BioPage({ params }: { params: { slug: string } }) 
         avatarUrl: profile.avatar_url || '',
         theme,
         pageSettings: (pageSettings || {}) as Record<string, string>,
-        socialLinks: (profile.social_links as Record<string, string>) || {},
+        socialLinks: (() => {
+          const all = { ...((profile.social_links as Record<string, string>) || {}) };
+          for (const id of (pageSettings.hidden_socials as string[]) || []) delete all[id];
+          return all;
+        })(),
       }}
       blocks={(blocks || []).map((b) => ({
         id: b.id,

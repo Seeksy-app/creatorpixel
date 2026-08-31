@@ -16,14 +16,15 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
-  SiTiktok, SiInstagram, SiYoutube, SiLinkedin, SiFacebook, SiX, SiBluesky,
+  SiTiktok, SiInstagram, SiYoutube, SiFacebook, SiX, SiBluesky,
 } from 'react-icons/si';
+import { FaLinkedinIn } from 'react-icons/fa6';
 
 const PLATFORMS = [
   { id: 'tiktok', name: 'TikTok', Icon: SiTiktok, color: '#000000' },
   { id: 'instagram', name: 'Instagram', Icon: SiInstagram, color: '#E4405F' },
   { id: 'youtube', name: 'YouTube', Icon: SiYoutube, color: '#FF0000' },
-  { id: 'linkedin', name: 'LinkedIn', Icon: SiLinkedin, color: '#0A66C2' },
+  { id: 'linkedin', name: 'LinkedIn', Icon: FaLinkedinIn, color: '#0A66C2' },
   { id: 'facebook', name: 'Facebook', Icon: SiFacebook, color: '#1877F2' },
   { id: 'x', name: 'X/Twitter', Icon: SiX, color: '#000000' },
   { id: 'bluesky', name: 'Bluesky', Icon: SiBluesky, color: '#0285FF' },
@@ -359,8 +360,14 @@ export default function SocialHubPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Platforms</label>
+                {accounts.length === 0 && (
+                  <p className="text-sm text-gray-500 mb-2">
+                    No accounts connected yet — use “Connect Account” above to link the
+                    platforms you post to.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
-                  {PLATFORMS.map((platform) => (
+                  {PLATFORMS.filter((p) => accounts.some((a) => a.platform === p.id)).map((platform) => (
                     <label
                       key={platform.id}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${

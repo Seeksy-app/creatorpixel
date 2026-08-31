@@ -40,6 +40,9 @@ import {
   Layout,
   Share2,
   Settings,
+  Eye,
+  EyeOff,
+  Plug,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase/client';
@@ -196,6 +199,7 @@ export default function BioEditorPage() {
   const [template, setTemplate] = useState('classic');
   const [pageSettings, setPageSettings] = useState<Record<string, unknown>>({});
   const [socialLinks, setSocialLinks] = useState<Record<string, string>>({});
+  const [connectedSocials, setConnectedSocials] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [previewSize, setPreviewSize] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
@@ -233,6 +237,33 @@ export default function BioEditorPage() {
       const templatePreset = BIO_TEMPLATES[profileData.theme as keyof typeof BIO_TEMPLATES] || BIO_TEMPLATES.classic;
       setPageSettings({ ...templatePreset.page_settings, ...(profileData.page_settings || {}) });
       setSocialLinks((profileData.social_links as Record<string, string>) || {});
+    }
+
+    // Connected posting accounts -> auto-suggest bio links for empty fields.
+    // Upload-Post uses 'x'; the bio platform list calls it 'twitter'.
+    const { data: accts } = await supabase
+      .from('social_accounts')
+      .select('platform, account_name')
+      .eq('profile_id', user.id);
+    if (accts?.length) {
+      const bioIdFor = (p: string) => (p === 'x' ? 'twitter' : p);
+      const connected: Record<string, string> = {};
+      for (const a of accts) connected[bioIdFor(a.platform)] = a.account_name || '';
+      setConnectedSocials(connected);
+
+      const existing = (profileData?.social_links as Record<string, string>) || {};
+      const suggestions: Record<string, string> = {};
+      for (const a of accts) {
+        const bioId = bioIdFor(a.platform);
+        const handle = (a.account_name || '').replace(/^@/, '').trim();
+        // Only prefill when the field is empty and the name looks like a handle
+        if (existing[bioId] || !handle || /\s/.test(handle)) continue;
+        const platform = SOCIAL_PLATFORMS.find((p) => p.id === bioId);
+        if (platform) suggestions[bioId] = platform.urlPrefix + handle;
+      }
+      if (Object.keys(suggestions).length) {
+        setSocialLinks((s) => ({ ...suggestions, ...s }));
+      }
     }
 
     const { data: blocksData } = await supabase
@@ -578,20 +609,57 @@ export default function BioEditorPage() {
 
           {activeTab === 'social' && (
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Social Links</h3>
+              <h3 className="font-semibold text-gray-900 mb-1">Social Links</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Connected accounts fill in automatically. Use the eye to show or hide a link
+                on your public page.
+              </p>
               <div className="space-y-2">
-                {SOCIAL_PLATFORMS.map((platform) => (
-                  <div key={platform.id} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-24">{platform.name}</span>
-                    <input
-                      type="url"
-                      value={socialLinks[platform.id] || ''}
-                      onChange={(e) => setSocialLinks((s) => ({ ...s, [platform.id]: e.target.value }))}
-                      placeholder={platform.urlPrefix}
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    />
-                  </div>
-                ))}
+                {SOCIAL_PLATFORMS.map((platform) => {
+                  const hidden = ((pageSettings.hidden_socials as string[]) || []).includes(platform.id);
+                  const isConnectable = ['tiktok', 'instagram', 'youtube', 'linkedin', 'facebook', 'twitter'].includes(platform.id);
+                  const isConnected = platform.id in connectedSocials;
+                  return (
+                    <div key={platform.id} className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 w-24 shrink-0">{platform.name}</span>
+                      <input
+                        type="url"
+                        value={socialLinks[platform.id] || ''}
+                        onChange={(e) => setSocialLinks((s) => ({ ...s, [platform.id]: e.target.value }))}
+                        placeholder={platform.urlPrefix}
+                        className={`flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm ${hidden ? 'opacity-50' : ''}`}
+                      />
+                      <button
+                        type="button"
+                        title={hidden ? 'Hidden on your page — click to show' : 'Shown on your page — click to hide'}
+                        onClick={() => setPageSettings((ps) => {
+                          const cur = (ps.hidden_socials as string[]) || [];
+                          return {
+                            ...ps,
+                            hidden_socials: hidden ? cur.filter((id) => id !== platform.id) : [...cur, platform.id],
+                          };
+                        })}
+                        className={`p-2 rounded-lg hover:bg-gray-100 ${hidden ? 'text-gray-300' : 'text-gray-600'}`}
+                      >
+                        {hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      {isConnectable && !isConnected && (
+                        <a
+                          href="/dashboard/social"
+                          title="Not connected — connect this account in Social Hub"
+                          className="p-2 rounded-lg text-gray-300 hover:text-blue-600 hover:bg-gray-100"
+                        >
+                          <Plug className="w-4 h-4" />
+                        </a>
+                      )}
+                      {isConnectable && isConnected && (
+                        <span title="Connected in Social Hub" className="p-2 text-green-500">
+                          <Plug className="w-4 h-4" />
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -622,6 +690,23 @@ export default function BioEditorPage() {
                     <option value="gradient">Gradient</option>
                     <option value="image">Image URL</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Page Animation</label>
+                  <select
+                    value={(settings?.page_animation as string) || 'none'}
+                    onChange={(e) => setPageSettings((s) => ({ ...s, page_animation: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="none">None</option>
+                    <option value="fade">Fade in</option>
+                    <option value="reveal_down">Reveal top to bottom</option>
+                    <option value="rise">Rise up</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    How your page appears when a visitor opens it. Skipped automatically for
+                    visitors who prefer reduced motion.
+                  </p>
                 </div>
                 {(settings?.background_type || 'solid') === 'solid' && (
                   <div>
