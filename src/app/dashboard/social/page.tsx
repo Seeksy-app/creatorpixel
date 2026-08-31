@@ -245,7 +245,10 @@ export default function SocialHubPage() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Social Hub</h1>
-        <p className="text-gray-500 mt-1">Manage your social media accounts and schedule posts.</p>
+        <p className="text-gray-500 mt-1">
+          Publish and schedule posts to your social accounts. Looking for your engagement
+          stats? Those live in <a href="/dashboard/attention" className="text-blue-600 hover:underline">Attention</a>.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -253,8 +256,12 @@ export default function SocialHubPage() {
           {/* Connected Accounts */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Share2 className="w-5 h-5" /> Connected Accounts
+              <Share2 className="w-5 h-5" /> Posting Accounts
             </h2>
+            <p className="text-xs text-gray-500 -mt-2 mb-4">
+              These connections let CreatorPixel publish on your behalf. They're separate
+              from the analytics connection on the Attention page.
+            </p>
             <div className="flex flex-wrap gap-3 mb-4">
               {PLATFORMS.map((platform) => {
                 const account = accounts.find((a) => a.platform === platform.id);

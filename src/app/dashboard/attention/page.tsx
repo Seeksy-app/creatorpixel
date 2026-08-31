@@ -153,7 +153,9 @@ function AttentionContent() {
     <div className="max-w-5xl">
       <h1 className="text-2xl font-bold text-gray-900">Attention</h1>
       <p className="text-gray-500 mt-1">
-        Sponsor-grade engagement metrics, pulled straight from the platforms.
+        Sponsor-grade engagement metrics, pulled straight from the platforms. This is a
+        read-only stats connection — to publish posts, use{' '}
+        <a href="/dashboard/social" className="text-blue-600 hover:underline">Social Hub</a>.
       </p>
 
       {error && (
