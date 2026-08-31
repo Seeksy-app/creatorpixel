@@ -23,8 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         {children}
         <Toaster position="bottom-right" />
-        <Script id="rb2b" strategy="afterInteractive">
-          {`!function(key){if(window.reb2b)return;window.reb2b={loaded:true};var s=document.createElement("script");s.async=true;s.src="https://ddwl4m2hdecbv.cloudfront.net/b/"+key+"/"+key+".js.gz";document.getElementsByTagName("script")[0].parentNode.insertBefore(s,document.getElementsByTagName("script")[0])}("GOYPYH44EYOX");`}
+        {/* Dogfood: CreatorPixel tracking on our own site (injects RB2B as Layer 1) */}
+        <Script id="creatorpixel" strategy="afterInteractive">
+          {`(function(c,r,e,a,t,o,p){c[t]=c[t]||function(){(c[t].q=c[t].q||[]).push(arguments)};o=r.createElement(e);o.async=1;o.src='/pixel.js';p=r.getElementsByTagName(e)[0];p.parentNode.insertBefore(o,p);})(window,document,'script','','cpx');
+cpx('init', '54af35e7-c802-4c3c-ae46-3ff9ae78fbcc', { rb2b: 'GOYPYH44EYOX' });
+cpx('track', 'pageview');`}
         </Script>
       </body>
     </html>
