@@ -352,10 +352,13 @@ export default function SocialHubPage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-3">
-              Click any account to connect or manage. Posting is separate from the
-              stats connection on <a href="/dashboard/attention" className="text-blue-500 hover:underline">Attention</a>.
-            </p>
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="text-xs text-blue-500 hover:underline mt-3 disabled:opacity-50"
+            >
+              Manage all connections
+            </button>
           </div>
 
           {/* Post Composer */}

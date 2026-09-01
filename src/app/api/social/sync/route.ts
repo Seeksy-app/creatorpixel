@@ -37,7 +37,7 @@ export async function POST() {
         const name = (typeof data === 'string'
           ? data
           : (d.name || d.username || d.display_name || '') as string).trim();
-        const avatar = (d.profile_picture || d.avatar || d.avatar_url || d.picture || d.image || null) as string | null;
+        const avatar = (d.social_images || d.profile_picture || d.avatar || d.avatar_url || d.picture || d.image || null) as string | null;
         const followersRaw = d.followers ?? d.follower_count ?? d.followers_count;
         const followers = typeof followersRaw === 'number' ? followersRaw : null;
         return { profile_id: user.id, platform, account_name: name, avatar_url: avatar, followers };

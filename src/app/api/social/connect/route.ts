@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const result = await client.generateJwt(username, {
       redirectUrl: `${appUrl}/dashboard/social`,
       platforms: platformsToConnect,
-      redirectButtonText: '← RETURN TO CREATORPIXEL',
+      redirectButtonText: 'RETURN TO CREATORPIXEL',
     });
 
     // Upload-Post returns the URL as access_url (older SDK docs said connection_url)
