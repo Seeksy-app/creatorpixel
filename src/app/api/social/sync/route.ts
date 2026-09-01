@@ -23,16 +23,29 @@ export async function POST() {
     );
 
     if (!profile?.social_accounts) {
+      await supabase.from('social_accounts').delete().eq('profile_id', user.id);
       return NextResponse.json({ accounts: [] });
     }
 
-    const accounts = Object.entries(profile.social_accounts as Record<string, { name?: string }>).map(
-      ([platform, data]) => ({
-        profile_id: user.id,
-        platform,
-        account_name: data?.name || null,
+    console.log('[social/sync] upload-post social_accounts:', JSON.stringify(profile.social_accounts));
+
+    // Upload-Post includes placeholder entries for unconnected platforms —
+    // only entries carrying a real account value count as connected
+    const accounts = Object.entries(profile.social_accounts as Record<string, unknown>)
+      .map(([platform, data]) => {
+        const d = (data || {}) as { name?: string; username?: string; display_name?: string };
+        const name = (typeof data === 'string' ? data : d.name || d.username || d.display_name || '').trim();
+        return { profile_id: user.id, platform, account_name: name };
       })
-    );
+      .filter((a) => a.account_name.length > 0);
+
+    // Drop platforms no longer connected, then upsert the current set
+    if (accounts.length > 0) {
+      await supabase.from('social_accounts').delete().eq('profile_id', user.id)
+        .not('platform', 'in', `(${accounts.map((a) => a.platform).join(',')})`);
+    } else {
+      await supabase.from('social_accounts').delete().eq('profile_id', user.id);
+    }
 
     for (const acc of accounts) {
       await supabase.from('social_accounts').upsert(

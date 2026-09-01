@@ -19,6 +19,7 @@ import {
   SiTiktok, SiInstagram, SiYoutube, SiFacebook, SiX, SiBluesky,
 } from 'react-icons/si';
 import { FaLinkedinIn } from 'react-icons/fa6';
+import { createClient } from '@/lib/supabase/client';
 
 const PLATFORMS = [
   { id: 'tiktok', name: 'TikTok', Icon: SiTiktok, color: '#000000' },
@@ -67,13 +68,41 @@ export default function SocialHubPage() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [topVideos, setTopVideos] = useState<Array<{ id: string; title: string; thumbnail_url: string | null; engaged: number }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_CHARS = 280;
 
   useEffect(() => {
     loadData();
+    loadTopVideos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadTopVideos() {
+    const supabase = createClient();
+    const { data: items } = await supabase
+      .from('content_items')
+      .select('id, title, thumbnail_url')
+      .limit(50);
+    if (!items?.length) return;
+
+    const { data: rows } = await supabase
+      .from('content_metrics_daily')
+      .select('content_item_id, engaged_views, views')
+      .in('content_item_id', items.map((i) => i.id));
+
+    const totals = new Map<string, number>();
+    for (const r of rows || []) {
+      totals.set(r.content_item_id, (totals.get(r.content_item_id) || 0) + (r.engaged_views || r.views || 0));
+    }
+    const top = items
+      .map((i) => ({ id: i.id, title: i.title || '', thumbnail_url: i.thumbnail_url, engaged: totals.get(i.id) || 0 }))
+      .filter((v) => v.engaged > 0)
+      .sort((a, b) => b.engaged - a.engaged)
+      .slice(0, 3);
+    setTopVideos(top);
+  }
 
   async function loadData() {
     setLoading(true);
@@ -257,49 +286,46 @@ export default function SocialHubPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Connected Accounts */}
+          {/* Connected Accounts — icon row; click any icon to connect/manage */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Share2 className="w-5 h-5" /> Posting Accounts
-            </h2>
-            <p className="text-xs text-gray-500 -mt-2 mb-4">
-              These connections let CreatorPixel publish on your behalf. They're separate
-              from the analytics connection on the Attention page.
-            </p>
-            <div className="flex flex-wrap gap-3 mb-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Share2 className="w-5 h-5" /> Posting Accounts
+              </h2>
+              {connecting && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mt-4">
               {PLATFORMS.map((platform) => {
                 const account = accounts.find((a) => a.platform === platform.id);
                 const connected = !!account;
                 return (
-                  <div
+                  <button
                     key={platform.id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                    onClick={handleConnect}
+                    disabled={connecting}
+                    title={connected
+                      ? `${platform.name} connected${account?.account_name ? ` as ${account.account_name}` : ''} — click to manage`
+                      : `Connect ${platform.name}`}
+                    className={`relative p-2.5 rounded-lg border transition disabled:opacity-50 ${
                       connected
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-gray-200 bg-gray-50'
+                        ? 'border-gray-200 bg-white hover:border-gray-300'
+                        : 'border-transparent bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
-                    <platform.Icon className="w-4 h-4" style={{ color: platform.color }} />
-                    <span className="text-sm font-medium">{platform.name}</span>
-                    {connected ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-gray-400" />
+                    <platform.Icon
+                      className="w-5 h-5"
+                      style={{ color: connected ? platform.color : '#C6CDD5' }}
+                    />
+                    {connected && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
-            <button
-              onClick={handleConnect}
-              disabled={connecting}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-            >
-              {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Connect Account
-            </button>
-            <p className="text-xs text-gray-500 mt-2">
-              You&apos;ll be redirected to Upload-Post to connect your accounts via OAuth.
+            <p className="text-xs text-gray-400 mt-3">
+              Click any icon to connect or manage accounts. Posting is separate from the
+              stats connection on <a href="/dashboard/attention" className="text-blue-500 hover:underline">Attention</a>.
             </p>
           </div>
 
@@ -499,22 +525,46 @@ export default function SocialHubPage() {
         {/* Sidebar */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-8">
-            <h3 className="font-semibold text-gray-900 mb-4">Quick Tips</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Quick Tips</h3>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li>• Connect your accounts via Upload-Post OAuth to post</li>
-              <li>• Text-only posts work on X, LinkedIn, Facebook, Bluesky</li>
-              <li>• Images supported on TikTok, Instagram, LinkedIn, Facebook, X, Bluesky</li>
-              <li>• Video supported on TikTok, Instagram, YouTube, LinkedIn, Facebook, X</li>
-              <li>• Schedule posts for optimal engagement</li>
+              <li>• Text posts publish to X, LinkedIn, Facebook, and Bluesky; video reaches TikTok, Instagram, and YouTube too.</li>
+              <li>• Schedule around your audience&apos;s peak hours — your Attention retention curves show when they watch.</li>
             </ul>
-            <a
-              href="https://docs.upload-post.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
-            >
-              Upload-Post Docs <ExternalLink className="w-3 h-3" />
-            </a>
+
+            {topVideos.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                  Your top videos · 90d
+                </h4>
+                <div className="space-y-3">
+                  {topVideos.map((v) => (
+                    <a
+                      key={v.id}
+                      href="/dashboard/attention"
+                      className="flex items-center gap-3 group"
+                    >
+                      {v.thumbnail_url && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={v.thumbnail_url}
+                          alt=""
+                          className="w-20 h-12 rounded-md object-cover shrink-0 group-hover:opacity-90"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-900 line-clamp-2 group-hover:text-brand-600">
+                          {v.title}
+                        </p>
+                        <p className="text-xs text-gray-400">{v.engaged.toLocaleString()} engaged views</p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  Repost your winners — proven content earns twice.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
