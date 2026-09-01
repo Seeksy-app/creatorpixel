@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Eye } from 'lucide-react';
 import Link from 'next/link';
@@ -11,6 +11,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // /auth/login?mode=signup opens straight into account creation
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'signup') setIsSignUp(true);
+  }, []);
   const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {

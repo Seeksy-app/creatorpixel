@@ -7,8 +7,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CreatorPixel - Own Your Audience Data',
-  description: 'The identity intelligence platform for creators. See who watches, clicks, and engages with your content.',
+  title: 'CreatorPixel — Know exactly who’s watching',
+  description: 'Attention is the real currency. See engaged views, watch time, and the real people behind your traffic — websites, landing pages, bio links, and podcasts.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
