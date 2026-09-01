@@ -158,7 +158,7 @@ cpx('identify', 'visitor@email.com');`;
     <div className="p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Site Pixel</h1>
-        <p className="text-gray-500 mt-1">Install CreatorPixel on your website — 3-layer identity resolution identifies up to 70% of visitors.</p>
+        <p className="text-gray-500 mt-1">Install CreatorPixel on your website — 3-layer identity resolution identifies up to 35% of US visitors.</p>
       </div>
 
       {/* Status Card */}
