@@ -77,6 +77,7 @@ export default function SocialHubPage() {
   const [posting, setPosting] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [topVideos, setTopVideos] = useState<Array<{ id: string; title: string; thumbnail_url: string | null; engaged: number }>>([]);
+  const [pastPosts, setPastPosts] = useState<Array<{ platform: string; text: string; url: string | null; image: string | null; date: string | null; likes: number | null }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_CHARS = 280;
@@ -84,6 +85,10 @@ export default function SocialHubPage() {
   useEffect(() => {
     loadData();
     loadTopVideos();
+    fetch('/api/social/past-posts')
+      .then((r) => r.json())
+      .then((d) => setPastPosts(Array.isArray(d.posts) ? d.posts : []))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -425,25 +430,46 @@ export default function SocialHubPage() {
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  {PLATFORMS.filter((p) => accounts.some((a) => a.platform === p.id)).map((platform) => (
-                    <label
-                      key={platform.id}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition ${
-                        selectedPlatforms.includes(platform.id)
-                          ? 'border-brand-600 bg-brand-50 text-brand-700'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedPlatforms.includes(platform.id)}
-                        onChange={() => togglePlatform(platform.id)}
-                        className="rounded border-gray-300 text-brand-600 sr-only"
-                      />
-                      <platform.Icon className="w-4 h-4" style={{ color: platform.color }} />
-                      <span className="text-sm font-medium">{platform.name}</span>
-                    </label>
-                  ))}
+                  {PLATFORMS.filter((p) => accounts.some((a) => a.platform === p.id)).map((platform) => {
+                    const account = accounts.find((a) => a.platform === platform.id)!;
+                    const selected = selectedPlatforms.includes(platform.id);
+                    return (
+                      <label
+                        key={platform.id}
+                        className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl border cursor-pointer transition ${
+                          selected
+                            ? 'border-brand-600 bg-brand-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => togglePlatform(platform.id)}
+                          className="sr-only"
+                        />
+                        <span className="relative shrink-0">
+                          {account.avatar_url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={account.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                          ) : (
+                            <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                              <platform.Icon className="w-3.5 h-3.5" style={{ color: platform.color }} />
+                            </span>
+                          )}
+                          <span className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm">
+                            <platform.Icon className="w-2.5 h-2.5" style={{ color: platform.color }} />
+                          </span>
+                        </span>
+                        <span className="text-left">
+                          <span className={`block text-sm font-medium leading-tight ${selected ? 'text-brand-700' : 'text-gray-900'}`}>
+                            {account.account_name}
+                          </span>
+                          <span className="block text-xs text-gray-400 leading-tight">{platform.name}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
               <div>
@@ -478,80 +504,6 @@ export default function SocialHubPage() {
             </div>
           </div>
 
-          {/* Post History */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">Post History</h2>
-            {posts.length === 0 ? (
-              <p className="text-gray-500 text-sm py-8 text-center">No posts yet. Create your first post above!</p>
-            ) : (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition"
-                  >
-                    <p className="text-sm text-gray-900 line-clamp-2">{post.content}</p>
-                    {post.media_url && (
-                      <div className="mt-2">
-                        {post.media_type === 'image' ? (
-                          <img src={post.media_url} alt="" className="h-16 w-16 rounded object-cover" />
-                        ) : (
-                          <span className="text-xs text-gray-500">📹 Video attached</span>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          post.status === 'published'
-                            ? 'bg-green-100 text-green-700'
-                            : post.status === 'scheduled'
-                              ? 'bg-amber-100 text-amber-700'
-                              : post.status === 'failed'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {post.status === 'published' && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
-                        {post.status === 'scheduled' && <Clock className="w-3 h-3 inline mr-1" />}
-                        {post.status === 'failed' && <XCircle className="w-3 h-3 inline mr-1" />}
-                        {post.status}
-                      </span>
-                      {post.platforms?.map((p) => {
-                        const url = getPlatformUrl(post, p);
-                        return (
-                          <span key={p} className="text-xs flex items-center gap-1">
-                            {(() => {
-                              const pl = PLATFORMS.find((x) => x.id === p);
-                              return pl ? <pl.Icon className="w-3 h-3" style={{ color: pl.color }} /> : null;
-                            })()}
-                            <span>{p}</span>
-                            {url && (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-brand-600 hover:text-brand-700"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            )}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {post.published_at
-                        ? new Date(post.published_at).toLocaleString()
-                        : post.scheduled_at
-                          ? `Scheduled: ${new Date(post.scheduled_at).toLocaleString()}`
-                          : new Date(post.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Sidebar */}
@@ -595,6 +547,90 @@ export default function SocialHubPage() {
                 <p className="text-xs text-gray-400 mt-3">
                   Repost your winners — proven content earns twice.
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* Past Posts */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+            <h3 className="font-semibold text-gray-900 mb-3">Past Posts</h3>
+            {pastPosts.length === 0 && posts.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Posts you publish here will show up in this list — along with recent
+                posts from your connected accounts when available.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {pastPosts.map((p, i) => {
+                  const pl = PLATFORMS.find((x) => x.id === p.platform);
+                  return (
+                    <a
+                      key={`ext-${i}`}
+                      href={p.url || '#'}
+                      target={p.url ? '_blank' : undefined}
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-3 group"
+                    >
+                      {p.image ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={p.image} alt="" className="w-12 h-12 rounded-md object-cover shrink-0" />
+                      ) : pl ? (
+                        <span className="w-12 h-12 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
+                          <pl.Icon className="w-4 h-4" style={{ color: pl.color }} />
+                        </span>
+                      ) : null}
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-900 line-clamp-2 group-hover:text-brand-600">
+                          {p.text || '(media post)'}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {pl?.name || p.platform}
+                          {p.likes != null ? ` · ${p.likes.toLocaleString()} likes` : ''}
+                          {p.date ? ` · ${new Date(p.date).toLocaleDateString()}` : ''}
+                        </p>
+                      </div>
+                    </a>
+                  );
+                })}
+
+                {posts.map((post) => (
+                  <div key={post.id} className="flex items-start gap-3">
+                    <span className={`mt-0.5 shrink-0 text-xs px-2 py-0.5 rounded-full ${
+                      post.status === 'published' ? 'bg-green-100 text-green-700'
+                      : post.status === 'scheduled' ? 'bg-amber-100 text-amber-700'
+                      : post.status === 'failed' ? 'bg-red-100 text-red-700'
+                      : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {post.status}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-900 line-clamp-2">{post.content}</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                        {post.platforms?.map((p) => {
+                          const pl = PLATFORMS.find((x) => x.id === p);
+                          const url = getPlatformUrl(post, p);
+                          return (
+                            <span key={p} className="inline-flex items-center gap-0.5">
+                              {pl && <pl.Icon className="w-3 h-3" style={{ color: pl.color }} />}
+                              {url && (
+                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-brand-600">
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </span>
+                          );
+                        })}
+                        <span>
+                          {post.published_at
+                            ? new Date(post.published_at).toLocaleDateString()
+                            : post.scheduled_at
+                              ? `Scheduled ${new Date(post.scheduled_at).toLocaleDateString()}`
+                              : new Date(post.created_at).toLocaleDateString()}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
