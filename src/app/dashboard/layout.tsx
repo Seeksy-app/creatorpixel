@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Eye, LayoutDashboard, Link2, BarChart3, FileText, Share2, LogOut, Code2, Users, Flame } from 'lucide-react';
+import LogoMark from '@/components/LogoMark';
+import { LayoutDashboard, Link2, BarChart3, FileText, Share2, LogOut, Code2, Users, Flame } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -31,10 +32,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         {/* Logo */}
         <div className="p-6 border-b border-gray-100">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-              <Eye className="w-5 h-5 text-white" />
-            </div>
+          <Link href="/dashboard" className="flex items-center gap-2 text-gray-500">
+            <LogoMark size={28} />
             <span className="font-bold text-lg text-gray-900">CreatorPixel</span>
           </Link>
         </div>

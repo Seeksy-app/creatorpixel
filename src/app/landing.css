@@ -58,3 +58,6 @@
 /* Light macOS-style title bar with the domain */
 .laptop .device-bar{background:#eef1f6;border-bottom:1px solid #dbe0ea}
 .laptop .device-url{background:#ffffff;color:#525d72;border:1px solid #e2e6ee}
+
+/* Logo mark sizing (the generic .logo svg rule would shrink it) */
+.logo>svg{width:24px;height:24px}

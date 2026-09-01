@@ -3,7 +3,8 @@
 import './landing.css'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, BarChart3, Check, ChevronRight, Link2, Menu, Share2, Sparkles, Users, X } from 'lucide-react'
+import { ArrowRight, BarChart3, Check, ChevronRight, Link2, Menu, Share2, Users, X } from 'lucide-react'
+import LogoMark from '@/components/LogoMark'
 
 const visitors = [
   { name: 'Maya Chen', detail: 'VP Marketing · Notion', source: 'LinkedIn', img: 12 as number | null },
@@ -17,7 +18,7 @@ function Reveal({ children, className = '', delay = 0 }: { children: React.React
   return <div ref={ref} className={`reveal ${className}`} style={{ '--delay': `${delay}ms` } as React.CSSProperties}>{children}</div>
 }
 function Count({ end, suffix = '' }: { end: number; suffix?: string }) { const [value, setValue] = useState(0); const ref = useRef<HTMLSpanElement>(null); useEffect(() => { const node = ref.current; if (!node) return; const observer = new IntersectionObserver(([entry]) => { if (!entry.isIntersecting) return; let current = 0; const timer = window.setInterval(() => { current += Math.ceil(end / 30); if (current >= end) { current = end; window.clearInterval(timer) } setValue(current) }, 30); observer.disconnect() }, { threshold: .6 }); observer.observe(node); return () => observer.disconnect() }, [end]); return <span ref={ref}>{value.toLocaleString()}{suffix}</span> }
-function Logo() { return <a href="#top" className="logo"><span><Sparkles /></span>CreatorPixel</a> }
+function Logo() { return <a href="#top" className="logo"><LogoMark />CreatorPixel</a> }
 function LiveVisitorStrip() { const [index, setIndex] = useState(0); useEffect(() => { const timer = window.setInterval(() => setIndex(i => (i + 1) % visitors.length), 3200); return () => window.clearInterval(timer) }, []); const visitor = visitors[index]; return <div className="live-strip"><div className="live-strip-head"><span><i /> Live visitors</span><small>+1 engaged view</small></div><div key={index} className="live-visitor animate-card">{visitor.img ? <img src={`https://i.pravatar.cc/64?img=${visitor.img}`} alt={`${visitor.name} avatar`} /> : <span className="live-avatar-anon"><Users /></span>}<div className="live-visitor-info"><strong>{visitor.name}</strong><span>{visitor.detail}</span></div><div className="live-visitor-meta"><b>ACTIVE</b><span>via {visitor.source}</span></div></div></div> }
 
 const captureFields = [
