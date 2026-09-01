@@ -37,7 +37,15 @@ interface SocialAccount {
   id: string;
   platform: string;
   account_name: string | null;
+  avatar_url?: string | null;
+  followers?: number | null;
   connected_at: string;
+}
+
+function fmtFollowers(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
 }
 
 interface SocialPost {
@@ -294,37 +302,58 @@ export default function SocialHubPage() {
               </h2>
               {connecting && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
             </div>
+            {/* Connected account chips: avatar + platform badge + handle + followers */}
             <div className="flex flex-wrap items-center gap-2 mt-4">
-              {PLATFORMS.map((platform) => {
-                const account = accounts.find((a) => a.platform === platform.id);
-                const connected = !!account;
+              {PLATFORMS.filter((p) => accounts.some((a) => a.platform === p.id)).map((platform) => {
+                const account = accounts.find((a) => a.platform === platform.id)!;
                 return (
                   <button
                     key={platform.id}
                     onClick={handleConnect}
                     disabled={connecting}
-                    title={connected
-                      ? `${platform.name} connected${account?.account_name ? ` as ${account.account_name}` : ''} — click to manage`
-                      : `Connect ${platform.name}`}
-                    className={`relative p-2.5 rounded-lg border transition disabled:opacity-50 ${
-                      connected
-                        ? 'border-gray-200 bg-white hover:border-gray-300'
-                        : 'border-transparent bg-gray-50 hover:bg-gray-100'
-                    }`}
+                    title={`${platform.name} — click to manage`}
+                    className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:border-gray-300 transition disabled:opacity-50"
                   >
-                    <platform.Icon
-                      className="w-5 h-5"
-                      style={{ color: connected ? platform.color : '#C6CDD5' }}
-                    />
-                    {connected && (
-                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
-                    )}
+                    <span className="relative shrink-0">
+                      {account.avatar_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={account.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
+                          <platform.Icon className="w-4 h-4" style={{ color: platform.color }} />
+                        </span>
+                      )}
+                      <span className="absolute -bottom-0.5 -left-0.5 w-[18px] h-[18px] rounded-full bg-white flex items-center justify-center shadow-sm">
+                        <platform.Icon className="w-3 h-3" style={{ color: platform.color }} />
+                      </span>
+                    </span>
+                    <span className="text-left">
+                      <span className="block text-sm font-medium text-gray-900 leading-tight">
+                        {account.account_name}
+                      </span>
+                      <span className="block text-xs text-gray-400 leading-tight">
+                        {account.followers != null ? `${fmtFollowers(account.followers)} followers` : platform.name}
+                      </span>
+                    </span>
                   </button>
                 );
               })}
+
+              {/* Unconnected platforms: quiet gray icons */}
+              {PLATFORMS.filter((p) => !accounts.some((a) => a.platform === p.id)).map((platform) => (
+                <button
+                  key={platform.id}
+                  onClick={handleConnect}
+                  disabled={connecting}
+                  title={`Connect ${platform.name}`}
+                  className="p-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 transition disabled:opacity-50"
+                >
+                  <platform.Icon className="w-5 h-5" style={{ color: '#C6CDD5' }} />
+                </button>
+              ))}
             </div>
             <p className="text-xs text-gray-400 mt-3">
-              Click any icon to connect or manage accounts. Posting is separate from the
+              Click any account to connect or manage. Posting is separate from the
               stats connection on <a href="/dashboard/attention" className="text-blue-500 hover:underline">Attention</a>.
             </p>
           </div>

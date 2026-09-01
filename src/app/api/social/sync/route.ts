@@ -33,9 +33,14 @@ export async function POST() {
     // only entries carrying a real account value count as connected
     const accounts = Object.entries(profile.social_accounts as Record<string, unknown>)
       .map(([platform, data]) => {
-        const d = (data || {}) as { name?: string; username?: string; display_name?: string };
-        const name = (typeof data === 'string' ? data : d.name || d.username || d.display_name || '').trim();
-        return { profile_id: user.id, platform, account_name: name };
+        const d = (data || {}) as Record<string, unknown>;
+        const name = (typeof data === 'string'
+          ? data
+          : (d.name || d.username || d.display_name || '') as string).trim();
+        const avatar = (d.profile_picture || d.avatar || d.avatar_url || d.picture || d.image || null) as string | null;
+        const followersRaw = d.followers ?? d.follower_count ?? d.followers_count;
+        const followers = typeof followersRaw === 'number' ? followersRaw : null;
+        return { profile_id: user.id, platform, account_name: name, avatar_url: avatar, followers };
       })
       .filter((a) => a.account_name.length > 0);
 
